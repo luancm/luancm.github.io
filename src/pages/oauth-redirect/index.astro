@@ -1,0 +1,170 @@
+---
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout
+  title="OAuth redirect"
+  description="Generic static page that surfaces query-string and fragment parameters from an OAuth redirect."
+  noindex
+>
+  <main>
+    <h1>OAuth redirect</h1>
+    <p class="lead">
+      Generic static page that surfaces any query-string or fragment parameters from an OAuth-style
+      redirect so you can copy them. Everything runs in your browser; nothing is sent anywhere.
+    </p>
+
+    <div id="content"></div>
+
+    <p class="hint" id="hint"></p>
+  </main>
+
+  <style>
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 0.25rem;
+    }
+    p.lead {
+      color: var(--muted);
+      margin: 0 0 1.5rem;
+    }
+    :global(.field) {
+      background: var(--box);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    :global(.label) {
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    :global(.value) {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 1rem;
+      word-break: break-all;
+      user-select: all;
+    }
+    :global(.row) {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    :global(button) {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    :global(button:focus-visible) {
+      outline: 2px solid var(--fg);
+      outline-offset: 2px;
+    }
+    :global(.ok) {
+      color: var(--ok);
+    }
+    :global(.err) {
+      color: var(--err);
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 1rem;
+    }
+  </style>
+
+  <script is:inline>
+    (function () {
+      const PRIORITY = ["code", "token", "access_token", "id_token", "state", "error"];
+      const ERROR_KEYS = new Set(["error", "error_description", "error_uri"]);
+
+      const params = new Map();
+      const fragment = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : "";
+      for (const [k, v] of new URLSearchParams(window.location.search)) params.set(k, v);
+      for (const [k, v] of new URLSearchParams(fragment)) {
+        if (!params.has(k)) params.set(k, v);
+      }
+
+      const content = document.getElementById("content");
+      const hint = document.getElementById("hint");
+
+      function field(label, value, opts) {
+        opts = opts || {};
+        const wrap = document.createElement("div");
+        wrap.className = "field";
+        const lbl = document.createElement("div");
+        lbl.className = "label";
+        lbl.textContent = label;
+        wrap.appendChild(lbl);
+
+        const row = document.createElement("div");
+        row.className = "row";
+        const val = document.createElement("div");
+        val.className = "value" + (opts.error ? " err" : "");
+        val.textContent = value;
+        row.appendChild(val);
+
+        if (opts.copyable) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = "Copy";
+          btn.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(value);
+              btn.textContent = "Copied";
+              btn.classList.add("ok");
+              setTimeout(() => {
+                btn.textContent = "Copy";
+                btn.classList.remove("ok");
+              }, 1500);
+            } catch (e) {
+              btn.textContent = "Press Ctrl+C";
+            }
+          });
+          row.appendChild(btn);
+        }
+        wrap.appendChild(row);
+        return wrap;
+      }
+
+      if (params.size === 0) {
+        content.appendChild(
+          field(
+            "No parameters present",
+            "Open this page via a redirect that includes query-string or fragment parameters.",
+            { error: true },
+          ),
+        );
+        return;
+      }
+
+      const ordered = [
+        ...PRIORITY.filter((k) => params.has(k)),
+        ...[...params.keys()].filter((k) => !PRIORITY.includes(k)),
+      ];
+
+      for (const key of ordered) {
+        const isError = ERROR_KEYS.has(key);
+        content.appendChild(
+          field(key, params.get(key), { copyable: !isError, error: isError }),
+        );
+      }
+
+      hint.textContent =
+        "Tip: most CLI flows only need the `code` value. Copy it and paste it back into your terminal.";
+    })();
+  </script>
+</Layout>
